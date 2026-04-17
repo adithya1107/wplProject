@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="max-w-md mx-auto space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Mark Attendance</h1>
+        <a href="{% url 'student_dashboard' %}" class="text-sm text-gray-500 hover:underline">← Back</a>
+    </div>
+
+    {% if success %}
+    <div class="bg-green-50 border border-green-200 rounded-xl p-4 text-green-800 font-medium text-center">
+        ✅ {{ success }}
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl shadow p-6 space-y-4">
+        <p class="text-sm text-gray-500">Enter the 6-character code from your teacher or scan the QR code.</p>
+        <form method="post" id="markForm" class="space-y-4">
+            {% csrf_token %}
+            <input type="hidden" name="latitude" id="latitude">
+            <input type="hidden" name="longitude" id="longitude">
+            <input name="code" id="codeInput" placeholder="Enter code (e.g. ABC123)"
+                maxlength="6" autocomplete="off" required
+                class="w-full border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <button type="submit" id="submitBtn"
+                class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700">
+                Submit Code
+            </button>
+        </form>
+
+        <div class="relative">
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t"></div></div>
+            <div class="relative flex justify-center text-xs text-gray-400 uppercase">
+                <span class="bg-white px-2">or</span>
+            </div>
+        </div>
+
+        <!-- QR Scanner -->
+        <div>
+            <button onclick="startScanner()"
+                class="w-full border py-3 rounded-lg text-sm hover:bg-gray-50 flex items-center justify-center gap-2">
+                📷 Scan QR Code
+            </button>
+            <div id="scannerContainer" class="hidden mt-4">
+                <video id="qrVideo" class="w-full rounded-lg bg-black" autoplay playsinline></video>
+                <button onclick="stopScanner()" class="mt-2 text-sm text-red-500 hover:underline">Stop scanning</button>
+            </div>
+        </div>
+    </div>
+
+    <p class="text-xs text-center text-gray-400">First 10 minutes = Present · After 10 minutes = Late (0.5x credit)</p>
+</div>
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script>
+let scanner = null;
+
+// Get location on page load
+if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+        pos => {
+            document.getElementById('latitude').value = pos.coords.latitude;
+            document.getElementById('longitude').value = pos.coords.longitude;
+        },
+        err => console.log('Location unavailable:', err)
+    );
+}
+
+// Auto uppercase input
+document.getElementById('codeInput').addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+});
+
+function startScanner() {
+    document.getElementById('scannerContainer').classList.remove('hidden');
+    scanner = new Html5Qrcode("qrVideo");
+    scanner.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        (decodedText) => {
+            document.getElementById('codeInput').value = decodedText.toUpperCase();
+            stopScanner();
+            document.getElementById('markForm').submit();
+        }
+    ).catch(err => console.log('Scanner error:', err));
+}
+
+function stopScanner() {
+    if (scanner) {
+        scanner.stop().then(() => {
+            document.getElementById('scannerContainer').classList.add('hidden');
+            scanner = null;
+        });
+    }
+}
+</script>
+{% endblock %}

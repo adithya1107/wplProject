@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">Attendance History</h1>
+        <a href="{% url 'student_dashboard' %}" class="text-sm text-gray-500 hover:underline">← Back</a>
+    </div>
+    <div class="bg-white rounded-xl shadow divide-y">
+        {% for r in records %}
+        <div class="flex items-center justify-between p-4">
+            <div>
+                <p class="font-medium text-sm">{{ r.course.course_name }}</p>
+                <p class="text-xs text-gray-500">{{ r.class_date }} · {{ r.marked_at|time:"g:i A" }}</p>
+            </div>
+            <span class="text-sm font-semibold capitalize
+                {% if r.status == 'present' %}text-green-600
+                {% elif r.status == 'late' %}text-yellow-600
+                {% else %}text-red-600{% endif %}">
+                {{ r.status }}{% if r.status == 'late' %} (0.5x){% endif %}
+            </span>
+        </div>
+        {% empty %}
+        <p class="text-center py-12 text-gray-400">No attendance records yet</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

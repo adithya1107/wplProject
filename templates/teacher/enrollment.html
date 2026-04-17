@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-2xl font-bold">{{ course.course_code }} — Enrollment</h1>
+        <a href="{% url 'manage_courses' %}" class="text-sm text-gray-500 hover:underline">← Courses</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Enrolled Students -->
+        <div class="bg-white rounded-xl shadow p-6">
+            <h2 class="font-semibold mb-4">Enrolled ({{ enrolled|length }})</h2>
+            <div class="space-y-2">
+                {% for e in enrolled %}
+                <div class="flex items-center justify-between p-3 border rounded-lg">
+                    <div>
+                        <p class="font-medium text-sm">{{ e.student.get_full_name }}</p>
+                        <p class="text-xs text-gray-500">{{ e.student.user_code }}</p>
+                    </div>
+                    <form method="post" action="{% url 'remove_student' e.id %}">
+                        {% csrf_token %}
+                        <button class="text-red-400 hover:text-red-600 text-xs">Remove</button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="text-gray-400 text-sm">No students enrolled</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Add Students -->
+        <div class="bg-white rounded-xl shadow p-6">
+            <h2 class="font-semibold mb-4">Add Students</h2>
+            <div class="space-y-2">
+                {% for student in all_students %}
+                <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+                    <div>
+                        <p class="font-medium text-sm">{{ student.get_full_name }}</p>
+                        <p class="text-xs text-gray-500">{{ student.user_code }}</p>
+                    </div>
+                    <form method="post" action="{% url 'enroll_student' course.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="student_id" value="{{ student.id }}">
+                        <button class="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700">Enroll</button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="text-gray-400 text-sm">All students are already enrolled</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

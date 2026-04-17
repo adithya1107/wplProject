@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="space-y-6">
+    <div class="flex justify-between items-center">
+        <h1 class="text-xl font-bold">{{ session.course.course_name }} — Live Session</h1>
+        <a href="{% url 'teacher_dashboard' %}" class="text-sm text-gray-500 hover:underline">← Back</a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- QR Code -->
+        <div class="bg-white rounded-xl shadow p-6 text-center space-y-4">
+            <img src="data:image/png;base64,{{ qr_b64 }}" class="w-56 h-56 mx-auto">
+            <p class="text-sm text-gray-500">Session Code</p>
+            <p class="text-4xl font-mono font-bold tracking-widest text-blue-600">{{ session.qr_code }}</p>
+            <p class="text-xs text-gray-400">First 10 min = Present · After 10 min = Late (0.5x)</p>
+            <p class="text-sm {% if time_remaining > 0 %}text-green-600{% else %}text-red-500{% endif %}">
+                {% if time_remaining > 0 %}{{ time_remaining }} min remaining{% else %}Session ended{% endif %}
+            </p>
+        </div>
+
+        <!-- Pending Approvals -->
+        <div class="bg-white rounded-xl shadow p-6 space-y-3">
+            <h3 class="font-semibold">Pending Approvals ({{ pending_attempts|length }})</h3>
+            {% for attempt in pending_attempts %}
+            <div class="p-3 border-2 border-yellow-200 rounded-lg">
+                <p class="font-medium text-sm">{{ attempt.student.get_full_name }}</p>
+                <p class="text-xs text-gray-500">{{ attempt.failure_reason }}</p>
+                <div class="flex gap-2 mt-2">
+                    <form method="post" action="{% url 'approve_attempt' attempt.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
+                        <button class="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700">Approve</button>
+                    </form>
+                    <form method="post" action="{% url 'reject_attempt' attempt.id %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
+                        <button class="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600">Reject</button>
+                    </form>
+                </div>
+            </div>
+            {% empty %}
+            <p class="text-gray-400 text-sm">No pending approvals</p>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Student List -->
+    <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="font-semibold mb-4">
+            Live Attendance ({{ students_status|length }} students)
+        </h3>
+        <div class="space-y-2">
+            {% for s in students_status %}
+            <div class="flex items-center justify-between p-3 border rounded-lg
+                {% if s.status == 'present' %}border-green-200 bg-green-50
+                {% elif s.status == 'late' %}border-yellow-200 bg-yellow-50
+                {% elif s.status == 'absent' %}border-red-200 bg-red-50
+                {% else %}border-gray-200{% endif %}">
+                <div>
+                    <p class="font-medium text-sm">{{ s.student.get_full_name }}</p>
+                    <p class="text-xs text-gray-500">{{ s.student.user_code }}</p>
+                </div>
+                <span class="text-xs font-semibold capitalize
+                    {% if s.status == 'present' %}text-green-700
+                    {% elif s.status == 'late' %}text-yellow-700
+                    {% elif s.status == 'absent' %}text-red-700
+                    {% else %}text-gray-500{% endif %}">
+                    {% if s.status == 'waiting' %}Waiting...{% else %}{{ s.status }}{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-refresh every 5 seconds
+    setTimeout(() => location.reload(), 5000);
+</script>
+{% endblock %}
