@@ -58,7 +58,7 @@ TEMPLATES = [
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': env('MYSQLDATABASE'),
+        'NAME': env('MYSQL_DATABASE'),
         'USER': env('MYSQLUSER'),
         'PASSWORD': env('MYSQLPASSWORD'),
         'HOST': env('MYSQLHOST'),
