@@ -9,7 +9,9 @@ environ.Env.read_env(BASE_DIR / '.env')
 
 SECRET_KEY = env('SECRET_KEY')
 DEBUG = env.bool('DEBUG', default=False)
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [
+    "wplproject-production.up.railway.app"
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -83,3 +85,7 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://wplproject-production.up.railway.app"
+]
