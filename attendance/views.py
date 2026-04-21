@@ -471,7 +471,7 @@ def mark_attendance(request):
                     session.teacher_latitude, session.teacher_longitude,
                     float(lat), float(lon)
                 )
-                if distance > 15:
+                if distance > 200:
                     AttendanceAttempt.objects.create(
                     session=session,
                     student=request.user,
