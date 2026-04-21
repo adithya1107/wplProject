@@ -227,7 +227,12 @@ def approve_attempt(request, attempt_id):
     attempt.reviewed_by = request.user
     attempt.reviewed_at = now
     attempt.save()
-    return redirect('generate_qr', schedule_id=request.POST.get('schedule_id'))
+
+    # Redirect back to wherever the teacher came from
+    schedule_id = request.POST.get('schedule_id', '0')
+    if schedule_id and schedule_id != '0':
+        return redirect('generate_qr', schedule_id=schedule_id)
+    return redirect('session_detail', session_id=attempt.session.id)
 
 
 @login_required
@@ -238,7 +243,11 @@ def reject_attempt(request, attempt_id):
     attempt.reviewed_by = request.user
     attempt.reviewed_at = timezone.now()
     attempt.save()
-    return redirect('generate_qr', schedule_id=request.POST.get('schedule_id'))
+
+    schedule_id = request.POST.get('schedule_id', '0')
+    if schedule_id and schedule_id != '0':
+        return redirect('generate_qr', schedule_id=schedule_id)
+    return redirect('session_detail', session_id=attempt.session.id)
 
 
 @login_required
@@ -460,18 +469,17 @@ def mark_attendance(request):
                     session.teacher_latitude, session.teacher_longitude,
                     float(lat), float(lon)
                 )
-                if distance > 100:
+                if distance > 15:
                     AttendanceAttempt.objects.create(
-                        session=session,
-                        student=request.user,
-                        failure_reason=f'Too far: {round(distance)}m away',
-                        student_latitude=float(lat),
-                        student_longitude=float(lon),
-                        distance_from_teacher=distance,
+                    session=session,
+                    student=request.user,
+                    failure_reason=f'Outside range: {round(distance)}m away (limit: 15m)',
+                    student_latitude=float(lat),
+                    student_longitude=float(lon),
+                    distance_from_teacher=distance,
                     )
                     return render(request, 'student/mark.html', {
-                        'error': f'Location check failed — you are {round(distance)}m away. Your attempt has been logged for teacher review.',
-                        'prefilled_code': prefilled_code,
+                        'error': f'You are {round(distance)}m away from the classroom. Maximum allowed is 15m. Your attempt has been logged for teacher approval.'
                     })
             else:
                 AttendanceAttempt.objects.create(
