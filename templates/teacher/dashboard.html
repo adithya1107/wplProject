@@ -19,11 +19,23 @@
                     <p class="font-semibold">{{ s.course.course_name }}</p>
                     <p class="text-sm text-gray-500">{{ s.course.course_code }} · {{ s.start_time|time:"g:i A" }} – {{ s.end_time|time:"g:i A" }} · {{ s.room_location|default:"Room TBD" }}</p>
                 </div>
-                <a href="{% url 'generate_qr' s.id %}"
-                   class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700">
-                    Generate QR
-                </a>
+
+                {# Hidden form — gets submitted with lat/lon after location is captured #}
+                <form method="post" action="{% url 'generate_qr' s.id %}" id="qrForm-{{ s.id }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="latitude" id="lat-{{ s.id }}">
+                    <input type="hidden" name="longitude" id="lon-{{ s.id }}">
+                    <button type="button"
+                        onclick="captureLocationAndSubmit('{{ s.id }}')"
+                        id="btn-{{ s.id }}"
+                        class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        Generate QR
+                    </button>
+                </form>
             </div>
+
+            {# Per-schedule status message shown below the row #}
+            <p id="locMsg-{{ s.id }}" class="text-xs text-gray-400 text-right pr-1 hidden"></p>
             {% endfor %}
         </div>
         {% else %}
@@ -31,4 +43,43 @@
         {% endif %}
     </div>
 </div>
+
+<script>
+function captureLocationAndSubmit(scheduleId) {
+    const btn = document.getElementById('btn-' + scheduleId);
+    const msg = document.getElementById('locMsg-' + scheduleId);
+
+    if (!navigator.geolocation) {
+        msg.textContent = 'Geolocation is not supported by this browser.';
+        msg.classList.remove('hidden', 'text-gray-400');
+        msg.classList.add('text-red-500');
+        return;
+    }
+
+    // Disable button and show feedback while waiting
+    btn.disabled = true;
+    btn.textContent = 'Getting location…';
+    msg.textContent = 'Waiting for GPS fix…';
+    msg.classList.remove('hidden', 'text-red-500');
+    msg.classList.add('text-gray-400');
+
+    navigator.geolocation.getCurrentPosition(
+        function(pos) {
+            document.getElementById('lat-' + scheduleId).value = pos.coords.latitude;
+            document.getElementById('lon-' + scheduleId).value = pos.coords.longitude;
+            msg.textContent = 'Location captured (' + pos.coords.accuracy.toFixed(0) + 'm accuracy) — opening session…';
+            document.getElementById('qrForm-' + scheduleId).submit();
+        },
+        function(err) {
+            btn.disabled = false;
+            btn.textContent = 'Generate QR';
+            msg.textContent = 'Location access denied — please allow location in your browser and try again.';
+            msg.classList.remove('text-gray-400');
+            msg.classList.add('text-red-500');
+            msg.classList.remove('hidden');
+        },
+        { timeout: 10000, enableHighAccuracy: true, maximumAge: 0 }
+    );
+}
+</script>
 {% endblock %}
