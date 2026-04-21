@@ -18,15 +18,27 @@
     </div>
     {% endif %}
 
+    {# Show a spinner while auto-submitting from a QR scan #}
+    {% if prefilled_code and not success and not error %}
+    <div id="autoSubmitBanner" class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-700 text-sm text-center">
+        📍 Getting your location and marking attendance…
+    </div>
+    {% endif %}
+
     <div class="bg-white rounded-xl shadow p-6 space-y-4">
         <p class="text-sm text-gray-500">Enter the 6-character code from your teacher or scan the QR code.</p>
+
         <form method="post" id="markForm" class="space-y-4">
             {% csrf_token %}
             <input type="hidden" name="latitude" id="latitude">
             <input type="hidden" name="longitude" id="longitude">
-            <input name="code" id="codeInput" placeholder="Enter code (e.g. ABC123)"
+
+            <input name="code" id="codeInput"
+                value="{{ prefilled_code }}"
+                placeholder="Enter code (e.g. ABC123)"
                 maxlength="6" autocomplete="off" required
                 class="w-full border rounded-lg px-4 py-3 text-center text-2xl font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-blue-400">
+
             <button type="submit" id="submitBtn"
                 class="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700">
                 Submit Code
@@ -47,7 +59,7 @@
                 📷 Scan QR Code
             </button>
             <div id="scannerContainer" class="hidden mt-4">
-                <video id="qrVideo" class="w-full rounded-lg bg-black" autoplay playsinline></video>
+                <div id="qrReader" class="w-full rounded-lg overflow-hidden"></div>
                 <button onclick="stopScanner()" class="mt-2 text-sm text-red-500 hover:underline">Stop scanning</button>
             </div>
         </div>
@@ -56,11 +68,53 @@
     <p class="text-xs text-center text-gray-400">First 10 minutes = Present · After 10 minutes = Late (0.5x credit)</p>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
-let scanner = null;
+let html5QrCode = null;
 
-// Get location on page load
+// Auto uppercase input
+document.getElementById('codeInput').addEventListener('input', function() {
+    this.value = this.value.toUpperCase();
+});
+
+// Extract the 6-char code from a value that might be a full URL or a plain code
+function extractCode(raw) {
+    raw = raw.trim();
+    try {
+        const url = new URL(raw);
+        const param = url.searchParams.get('code');
+        if (param) return param.toUpperCase();
+    } catch (_) {}
+    // Fallback: treat as plain code
+    return raw.toUpperCase();
+}
+
+// ── Auto-submit when arriving via QR scan link (?code=...) ──────────────────
+const prefilled = document.getElementById('codeInput').value.trim();
+if (prefilled && !document.getElementById('autoSubmitBanner')?.classList.contains('hidden') === false) {
+    // autoSubmitBanner is only rendered by Django when prefilled_code is set and no result yet
+}
+
+{% if prefilled_code and not success and not error %}
+(function autoSubmit() {
+    function doSubmit(lat, lon) {
+        if (lat) document.getElementById('latitude').value = lat;
+        if (lon) document.getElementById('longitude').value = lon;
+        document.getElementById('markForm').submit();
+    }
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            pos => doSubmit(pos.coords.latitude, pos.coords.longitude),
+            _err => doSubmit(null, null),  // submit anyway; server will handle missing location
+            { timeout: 6000 }
+        );
+    } else {
+        doSubmit(null, null);
+    }
+})();
+{% else %}
+// Manual entry: grab location quietly in the background
 if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
         pos => {
@@ -70,32 +124,44 @@ if (navigator.geolocation) {
         err => console.log('Location unavailable:', err)
     );
 }
-
-// Auto uppercase input
-document.getElementById('codeInput').addEventListener('input', function() {
-    this.value = this.value.toUpperCase();
-});
+{% endif %}
+// ────────────────────────────────────────────────────────────────────────────
 
 function startScanner() {
     document.getElementById('scannerContainer').classList.remove('hidden');
-    scanner = new Html5Qrcode("qrVideo");
-    scanner.start(
+    html5QrCode = new Html5Qrcode("qrReader");
+    html5QrCode.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
         (decodedText) => {
-            document.getElementById('codeInput').value = decodedText.toUpperCase();
+            // QR encodes a full URL — extract just the code
+            const code = extractCode(decodedText);
+            document.getElementById('codeInput').value = code;
             stopScanner();
-            document.getElementById('markForm').submit();
+            // Get location then submit
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => {
+                        document.getElementById('latitude').value = pos.coords.latitude;
+                        document.getElementById('longitude').value = pos.coords.longitude;
+                        document.getElementById('markForm').submit();
+                    },
+                    _err => document.getElementById('markForm').submit(),
+                    { timeout: 6000 }
+                );
+            } else {
+                document.getElementById('markForm').submit();
+            }
         }
     ).catch(err => console.log('Scanner error:', err));
 }
 
 function stopScanner() {
-    if (scanner) {
-        scanner.stop().then(() => {
+    if (html5QrCode) {
+        html5QrCode.stop().then(() => {
             document.getElementById('scannerContainer').classList.add('hidden');
-            scanner = null;
-        });
+            html5QrCode = null;
+        }).catch(() => {});
     }
 }
 </script>

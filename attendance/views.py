@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
+from django.urls import reverse
 from .models import *
 import qrcode, io, base64, random, string, json, math
 
@@ -152,8 +153,13 @@ def generate_qr(request, schedule_id):
             teacher_longitude=float(lon) if lon else None,
         )
 
-    # Generate QR image
-    img = qrcode.make(session.qr_code)
+    # ── CHANGED: encode a full URL so phone cameras open the browser directly ──
+    mark_url = request.build_absolute_uri(
+        reverse('mark_attendance') + f'?code={session.qr_code}'
+    )
+    img = qrcode.make(mark_url)
+    # ──────────────────────────────────────────────────────────────────────────
+
     buf = io.BytesIO()
     img.save(buf, format='PNG')
     qr_b64 = base64.b64encode(buf.getvalue()).decode()
@@ -413,6 +419,9 @@ def student_dashboard(request):
 
 @login_required
 def mark_attendance(request):
+    # ── CHANGED: support code arriving via GET (QR scan) or POST (manual form) ──
+    prefilled_code = request.GET.get('code', '').upper().strip()
+
     if request.method == 'POST':
         code = request.POST.get('code', '').upper().strip()
         lat = request.POST.get('latitude')
@@ -425,22 +434,23 @@ def mark_attendance(request):
                 qr_code=code, session_date=today, is_active=True
             )
         except AttendanceSession.DoesNotExist:
-            return render(request, 'student/mark.html', {'error': 'Invalid or expired code'})
+            return render(request, 'student/mark.html', {'error': 'Invalid or expired code', 'prefilled_code': prefilled_code})
 
         # Check enrollment
         if not Enrollment.objects.filter(
             student=request.user, course=session.course, status='enrolled'
         ).exists():
-            return render(request, 'student/mark.html', {'error': 'You are not enrolled in this course'})
+            return render(request, 'student/mark.html', {'error': 'You are not enrolled in this course', 'prefilled_code': prefilled_code})
 
         # Already marked?
         if AttendanceRecord.objects.filter(session=session, student=request.user).exists():
-            return render(request, 'student/mark.html', {'error': 'Attendance already marked'})
+            return render(request, 'student/mark.html', {'error': 'Attendance already marked', 'prefilled_code': prefilled_code})
 
         # Already has pending attempt?
         if AttendanceAttempt.objects.filter(session=session, student=request.user, status='pending').exists():
             return render(request, 'student/mark.html', {
-                'error': 'You have a pending verification request. Wait for teacher approval.'
+                'error': 'You have a pending verification request. Wait for teacher approval.',
+                'prefilled_code': prefilled_code,
             })
 
         # Location check
@@ -460,7 +470,8 @@ def mark_attendance(request):
                         distance_from_teacher=distance,
                     )
                     return render(request, 'student/mark.html', {
-                        'error': f'Location check failed — you are {round(distance)}m away. Your attempt has been logged for teacher review.'
+                        'error': f'Location check failed — you are {round(distance)}m away. Your attempt has been logged for teacher review.',
+                        'prefilled_code': prefilled_code,
                     })
             else:
                 AttendanceAttempt.objects.create(
@@ -469,7 +480,8 @@ def mark_attendance(request):
                     failure_reason='Location not provided',
                 )
                 return render(request, 'student/mark.html', {
-                    'error': 'Location required. Please allow location access and try again.'
+                    'error': 'Location required. Please allow location access and try again.',
+                    'prefilled_code': prefilled_code,
                 })
 
         # Calculate status
@@ -494,7 +506,8 @@ def mark_attendance(request):
             'success': f'Marked as {status.upper()}!' + (' (0.5x credit)' if status == 'late' else '')
         })
 
-    return render(request, 'student/mark.html')
+    return render(request, 'student/mark.html', {'prefilled_code': prefilled_code})
+    # ──────────────────────────────────────────────────────────────────────────
 
 
 @login_required
