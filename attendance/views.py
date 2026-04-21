@@ -184,6 +184,7 @@ def generate_qr(request, schedule_id):
         timezone.datetime.combine(today, session.start_time)
     )
     elapsed_minutes = int((now - start_dt).total_seconds() / 60)
+    marked_count = sum(1 for s in students_status if s['status'] in ['present', 'late'])
 
     return render(request, 'teacher/qr_session.html', {
         'session': session,
@@ -195,6 +196,7 @@ def generate_qr(request, schedule_id):
         'time_remaining': max(0, int((
             timezone.make_aware(timezone.datetime.combine(today, session.end_time)) - now
         ).total_seconds() / 60)),
+        'marked_count': marked_count,
     })
 
 
